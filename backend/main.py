@@ -66,13 +66,14 @@ async def add_process_time_header(request: Request, call_next):
 
 # Enable CORS for the frontend.
 # Add your production URL here before deploying, e.g. "https://auditmind.vercel.app"
+_extra = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:8000",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:8000",
     "null",  # file:// — opening index.html directly from disk
-]
+] + _extra
 
 app.add_middleware(
     CORSMiddleware,
