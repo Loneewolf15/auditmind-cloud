@@ -1,75 +1,113 @@
-# AuditMind
-![CI](https://github.com/we-make-devs/auditmind/actions/workflows/test.yml/badge.svg)
+# AuditMind — Open Source Track
+![CI](https://github.com/Loneewolf15/auditmind-oss/actions/workflows/test.yml/badge.svg)
 
-> **"AuditMind doesn't verify identity — it remembers verification, permanently and compliantly, for any system that needs an audit trail."**
+> **"AuditMind doesn't just verify identity — it remembers verification, permanently and compliantly, powered entirely by Cognee's open-source memory engine."**
 
-**AuditMind** is the audit memory layer that sits underneath any system that needs to prove who was verified, when, and with what confidence — and needs to be able to forget that record on legal request. It is built natively on Cognee's hybrid graph-vector memory engine.
+**AuditMind** is a tamper-evident AI memory layer for identity-critical systems. It sits underneath any upstream verification process (facial recognition, ID scanning, biometric checks) and turns raw pass/fail events into a permanent, queryable, and legally-forgettable audit graph — with no external database. Cognee is the sole persistence layer.
 
-**Hackathon:** WeMakeDevs × Cognee "Where's My Context?" — June 29 to July 5, 2026  
-**Team:** AuditMind (Divine, Sister, Cofounder)
+**Hackathon:** WeMakeDevs × Cognee "Where's My Context?" — June 29 to July 5, 2026
+**Track:** Best Use of Cognee Open Source
+**Team:** AuditMind — Divine, Success, Chukwuemelie
 
-## The Core Problem
-Upstream systems (like facial recognition engines or ID scanners) verify people, but they lack a native, queryable memory of those events. We designed AuditMind for three concrete domains where preserving the *record* of verification is critical:
+---
 
-1. **Exam Integrity (JAMB/CBT centres)** — proving a candidate was continuously the same person throughout a session, with a queryable graph trail if fraud is suspected afterward.
-2. **Banking/Fintech KYC** — proving a customer was verified per CBN circulars, with the surgical ability to honour an NDPR deletion request without destroying the rest of the institutional audit trail.
-3. **Pension Verification** — proving a pensioner is alive and was checked remotely, replacing manual field agent visits with a permanent, auditable digital memory.
+## The Problem
 
-AuditMind receives events (pass/fail/anomaly) from these upstream verification processes and turns them into a permanent, queryable, and legally-forgettable audit graph.
+Upstream identity systems verify people but produce no queryable audit trail. When a regulator asks *"Was this candidate the same person throughout their exam?"* or *"Prove this KYC check happened and who authorised it"* — traditional systems have no answer. They forget.
 
-## How it works (Best Use of Cognee)
-We use Cognee's core APIs (v1.0) explicitly:
-1. `remember()`: Ingests structured `DataPoint` models (User, Session, Event, Anomaly) using custom graph models.
-2. `recall()`: Uses `GRAPH_COMPLETION` to allow compliance officers to query memory using natural language traversing complex relationships.
-3. `improve()`: explicitly triggers an enrichment pass to bridge session-level context into the permanent graph.
-4. `forget()`: Our NDPR/GDPR compliance mechanism. Surgically removes a session's dataset from relational, graph, and vector stores without affecting the rest of the audit trail.
-5. `visualize_graph()`: Used to render the Cognee graph live.
+AuditMind fixes that for three high-stakes Nigerian contexts:
+
+1. **Exam Integrity (JAMB/CBT)** — continuous identity verification across a session, with a graph trail that can detect proxy candidates after the fact.
+2. **Banking KYC (CBN Circular BSD/DIR/PUB/LAB/019/002)** — prove a customer was verified, with surgical NDPR deletion that removes one record without destroying the institutional trail.
+3. **Pension Remote Verification** — replace manual field visits with a permanent, auditable digital memory of liveness checks.
+4. **Traffic Identity Audit** — cross-checkpoint driver identity tracking that flags impossible travel speeds and plate mismatches.
+
+---
+
+## Why Cognee (Open Source)
+
+AuditMind uses Cognee as its **sole database**. No PostgreSQL. No Redis. No external search engine. Every event is written to Cognee's self-hosted hybrid graph-vector store (KuzuDB + LanceDB) via the open-source SDK.
+
+All four lifecycle APIs are used explicitly:
+
+| API | How AuditMind uses it |
+|-----|-----------------------|
+| `cognee.remember()` | Ingests identity events as typed `DataPoint` graph entities (`IdentityEvent → SessionEntity → UserEntity → AnomalyType`) with a custom extraction prompt |
+| `cognee.recall()` | `GRAPH_COMPLETION` search lets compliance officers query in natural language — *"Show all anomalies in session jamb_2026_fraud_002"* |
+| `cognee.improve()` | Explicit enrichment pass after each scenario — the UI shows a Before/After comparison of agent answers to prove the graph got smarter |
+| `cognee.forget()` | NDPR/GDPR Article 17 surgical deletion — wipes one session from graph + vector stores and issues a signed Certificate of Erasure |
+
+The AI agent has **no amnesia**: memory persists across infinite browser sessions. Refreshing the page and clicking *Prove Persistent Memory* re-hydrates the D3 graph and the agent recalls every event by name — from Cognee's local stores, not the browser.
+
+---
 
 ## Quick Start
-AuditMind runs natively with zero external server dependencies using LanceDB (vector) and Kuzu (graph).
 
 ```bash
-# 1. Clone repo
-git clone https://github.com/.../auditmind.git
-cd auditmind
+git clone https://github.com/Loneewolf15/auditmind-oss.git
+cd auditmind-oss
 
-# 2. Setup environment
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -r backend/requirements.txt
 
-# 3. Run Self-Hosted Mode (MacBook Neo Track)
-make run-selfhosted
+cp .env.selfhosted.example .env.selfhosted
+# Fill in your LLM_API_KEY in .env.selfhosted
 
-# OR Run Cloud Mode (iPhone 17 Track)
-make run-cloud
+make run-selfhosted
 ```
 
-Open `frontend/index.html` in your browser to interact with the demo.
+Open `frontend/index.html` in your browser.
+
+---
 
 ## Demo Scenarios
-No typing required. Just click the pre-built scenarios in the UI:
-1. **Clean Exam Session**: Normal verification sequence. Graph builds a clean chain.
-2. **Fraud Attempt**: Confidence degrades. Anomaly nodes cluster visibly.
-3. **NDPR Purge Request**: Legal deletion. Dataset wiped from graph and vector stores via `cognee.forget()`.
 
-## Judging Criteria Mapping
-- **Potential Impact**: Built for real-world identity verification using actual Nigerian context (NDPR, JAMB fraud stats).
-- **Creativity**: Re-framing `forget()` as a legal compliance tool (NDPR/GDPR Article 17).
-- **Technical Excellence**: 15 tests, GitHub Actions CI, Dockerized, cleanly separated backend/frontend.
-- **Best Use of Cognee**: Uses custom `DataPoint` models, all 4 lifecycle APIs, and `visualize_graph()`.
-- **User Experience**: One-click visual scenarios via D3.js + Tailwind.
+No typing required — one click per scenario:
 
-## Acknowledgements & Disclosures
+1. **Clean Exam Session** — Normal verification chain. Green nodes. Clean graph.
+2. **Fraud Attempt** — Confidence degrades mid-session. Red anomaly nodes cluster. Agent detects the proxy candidate.
+3. **NDPR Purge Request** — Nodes fade out. `cognee.forget()` wipes the dataset. A signed certificate of deletion is issued.
+4. **Traffic Identity Audit** — Driver A001 passes two tollgates cleanly, hits an impossible-speed anomaly at Sagamu, then a plate mismatch at Ibadan.
 
-**AI Assistance:** Claude (Anthropic) was used during the pre-hackathon 
-planning phase (before June 29, 2026) for strategic architecture decisions, 
-API research, judging criteria analysis, and sprint planning. All code, 
-implementation decisions, and creative direction were executed by the 
-development team during the hackathon window (June 29 – July 5, 2026), 
-in full compliance with Rule 8 and Rule 9.
+After any scenario: click **Prove Persistent Memory** — refresh the page first if you want to make the point viscerally.
 
-**Stack:** Python 3.11, FastAPI, Cognee SDK, D3.js, Tailwind CSS, 
-pytest, httpx, python-dotenv, uvicorn, Docker.
+---
 
-**Open source assets:** None. All UI and code is original work.
+## Architecture
+
+```
+Browser (D3.js + Tailwind)
+        │  fetch()
+        ▼
+FastAPI Backend
+        │  cognee.remember() / recall() / improve() / forget()
+        ▼
+Cognee Open Source SDK
+        ├── KuzuDB  (graph: entities + relationships)
+        └── LanceDB (vector: semantic search index)
+```
+
+---
+
+## Judging Criteria
+
+| Criterion | Evidence |
+|-----------|----------|
+| **Best Use of Cognee** | All 4 lifecycle APIs, custom `DataPoint` schema, `GRAPH_COMPLETION` search, self-hosted only |
+| **Potential Impact** | Real Nigerian regulatory context (NDPR, JAMB, CBN) |
+| **Creativity** | `forget()` as a legal compliance tool with a certificate of erasure |
+| **Technical Excellence** | 32 passing tests, GitHub Actions CI, Dockerized, Railway-ready |
+| **User Experience** | One-click scenarios, live D3 graph, Before/After improve() comparison |
+
+---
+
+## Stack
+
+Python 3.11 · FastAPI · Cognee SDK (KuzuDB + LanceDB) · Anthropic Claude · Google Gemini (fallback) · D3.js · Tailwind CSS · Docker · Railway
+
+---
+
+## Disclosure
+
+AI assistants (Claude) were used during development in compliance with hackathon Rule 8. All creative direction, architecture decisions, and implementation were by the team.
