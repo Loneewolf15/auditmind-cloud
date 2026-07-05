@@ -12,7 +12,7 @@
         .console-output { font-family: 'Menlo', 'Monaco', 'Courier New', monospace; font-size: 0.85rem; }
         .node circle { stroke: #000000; stroke-width: 2px; transition: all 0.3s; }
         .node text { font-size: 11px; fill: #cbd5e1; pointer-events: none; text-shadow: 0 1px 4px rgba(0,0,0,1); font-weight: 500; }
-        .link { stroke: #334155; stroke-opacity: 0.6; stroke-width: 1px; }
+        .link { stroke: #334155; stroke-opacity: 0.6; stroke-width: 1px; vector-effect: non-scaling-stroke; }
         .fade-out { animation: fadeOut 1s forwards; }
         @keyframes fadeOut { to { opacity: 0; fill: #ff4d4d; } }
         /* SecOps Glassmorphism - Restrained */
@@ -404,7 +404,7 @@
             .append("svg")
             .attr("width", "100%")
             .attr("height", "100%")
-            .call(d3.zoom().on("zoom", (e) => svg.select("g").attr("transform", e.transform)))
+            .call(d3.zoom().on("zoom", (e) => svg.attr("transform", e.transform)))
             .append("g");
 
         function log(msg, type="info") {
@@ -436,7 +436,10 @@
             simulation = d3.forceSimulation(graphData.nodes)
                 .force("link", d3.forceLink(graphData.links).id(d => d.id).distance(100))
                 .force("charge", d3.forceManyBody().strength(-300))
-                .force("center", d3.forceCenter(width / 2, height / 2));
+                .force("center", d3.forceCenter(width / 2, height / 2))
+                .alphaDecay(0.03)
+                .velocityDecay(0.4)
+                .on("end", () => simulation.stop());
 
             const link = svg.append("g")
                 .attr("class", "links")

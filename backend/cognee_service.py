@@ -179,7 +179,7 @@ async def _call_anthropic(api_key: str, system: str, history: list, user_message
     kwargs = {"api_key": api_key}
     if base_url:
         kwargs["base_url"] = base_url
-    client = anthropic.AsyncAnthropic(**kwargs)
+    client = anthropic.AsyncAnthropic(timeout=25.0, **kwargs)
     resp = await client.messages.create(model=model, max_tokens=1024, system=system, messages=messages)
     return resp.content[0].text, model
 
