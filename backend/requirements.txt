@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+cognee
+python-dotenv
+httpx
+pydantic
+pydantic-settings
+tenacity
+anthropic
+google-genai

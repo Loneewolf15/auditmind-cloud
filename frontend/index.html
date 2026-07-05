@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuditMind - Cognee Hackathon 2026</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #000000; color: #e2e8f0; }
+        .console-output { font-family: 'Menlo', 'Monaco', 'Courier New', monospace; font-size: 0.85rem; }
+        .node circle { stroke: #000000; stroke-width: 2px; transition: all 0.3s; }
+        .node text { font-size: 11px; fill: #cbd5e1; pointer-events: none; text-shadow: 0 1px 4px rgba(0,0,0,1); font-weight: 500; }
+        .link { stroke: #334155; stroke-opacity: 0.6; stroke-width: 1px; }
+        .fade-out { animation: fadeOut 1s forwards; }
+        @keyframes fadeOut { to { opacity: 0; fill: #ff4d4d; } }
+        /* SecOps Glassmorphism - Restrained */
+        .glass-panel {
+            background: rgba(10, 10, 10, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+        }
+        .toast-enter { animation: slideIn 0.3s ease-out forwards; }
+        .toast-exit { animation: slideOut 0.3s ease-in forwards; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
+        .loading-pulse { animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+        .tab-btn { border-bottom: 2px solid transparent; transition: all 0.15s; }
+        .tab-btn.active { border-bottom-color: #6366f1; color: #e2e8f0; }
+        .chat-bubble-user { background: #1e293b; border-radius: 12px 12px 2px 12px; }
+        .chat-bubble-agent { background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.2); border-radius: 12px 12px 12px 2px; }
+        .compare-col { background: rgba(15,23,42,0.8); border: 1px solid #1e293b; border-radius: 8px; }
+        .typing-dot { animation: typingBounce 1.2s infinite; }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typingBounce { 0%,60%,100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-4px); opacity: 1; } }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden bg-black">
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+    <!-- Header -->
+    <header class="bg-slate-900 border-b border-slate-800 p-4 flex items-center justify-between z-10 shadow-md">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded bg-blue-600 flex items-center justify-center text-white font-bold">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight text-white leading-none">AuditMind</h1>
+                <span class="text-slate-500 font-normal text-xs">AI Agent with Permanent Memory · WeMakeDevs × Cognee</span>
+            </div>
+        </div>
+        <div class="flex gap-3 items-center">
+            <!-- Dynamic mode badge — populated by /api/mode -->
+            <div id="mode-badge" class="text-xs bg-slate-800 px-3 py-1 rounded-full flex items-center gap-2 text-slate-400">
+                <span class="w-2 h-2 rounded-full bg-slate-600 block"></span> Loading...
+            </div>
+            <div class="text-xs text-slate-400 bg-slate-800 px-3 py-1 rounded-full flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-green-500 block"></span> Cognee Active
+            </div>
+        </div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden">
+        <!-- Sidebar - Controls -->
+        <div class="w-80 glass-panel border-r border-slate-800 flex flex-col z-10 shadow-xl overflow-y-auto">
+            <div class="p-5">
+                <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Demo Scenarios</h2>
+                
+                <div class="space-y-4">
+                    <!-- Scenario 1 -->
+                    <div class="bg-slate-800 rounded-lg p-4 border border-slate-700 hover:border-blue-500 transition cursor-pointer" onclick="runScenario('clean_session')">
+                        <div class="flex items-center gap-2 mb-2">
+                            <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                            <h3 class="font-medium text-white">Clean Exam Session</h3>
+                        </div>
+                        <p class="text-xs text-slate-400">Normal verification sequence. Graph builds a clean chain.</p>
+                    </div>
+
+                    <!-- Scenario 2 -->
+                    <div class="bg-slate-800 rounded-lg p-4 border border-slate-700 hover:border-red-500 transition cursor-pointer" onclick="runScenario('fraud_attempt')">
+                        <div class="flex items-center gap-2 mb-2">
+                            <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                            <h3 class="font-medium text-white">Fraud Attempt</h3>
+                        </div>
+                        <p class="text-xs text-slate-400">Confidence degrades. Anomaly nodes cluster visibly.</p>
+                    </div>
+
+                    <!-- Scenario 3 -->
+                    <div class="bg-slate-800 rounded-lg p-4 border border-slate-700 hover:border-amber-500 transition cursor-pointer" onclick="runScenario('ndpr_purge')">
+                        <div class="flex items-center gap-2 mb-2">
+                            <div class="w-3 h-3 rounded-full bg-amber-500"></div>
+                            <h3 class="font-medium text-white">NDPR Purge Request</h3>
+                        </div>
+                        <p class="text-xs text-slate-400">Legal deletion. Dataset wiped from graph and vector stores.</p>
+                    </div>
+
+                    <!-- Scenario 4 -->
+                    <div class="bg-slate-800 rounded-lg p-4 border border-slate-700 hover:border-blue-400 transition cursor-pointer" onclick="runScenario('traffic_audit')">
+                        <div class="flex items-center gap-2 mb-2">
+                            <div class="w-3 h-3 rounded-full bg-blue-400"></div>
+                            <h3 class="font-medium text-white">Traffic Identity Audit</h3>
+                        </div>
+                        <p class="text-xs text-slate-400">Driver passes checkpoints. Impossible travel speed triggers plate-mismatch cascade.</p>
+                    </div>
+                </div>
+
+                <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mt-8 mb-4">Custom Scenario</h2>
+                <div class="space-y-3 bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                    <input type="text" id="simUser" placeholder="User ID (e.g. USR-999)" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-white focus:outline-none focus:border-blue-500">
+                    <select id="simType" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-white focus:outline-none focus:border-blue-500">
+                        <option value="exam">Exam Session</option>
+                        <option value="kyc">KYC Verification</option>
+                        <option value="pension">Pension Check</option>
+                        <option value="traffic">Traffic Audit</option>
+                    </select>
+                    <div class="flex items-center justify-between text-xs text-slate-400">
+                        <span>Confidence:</span>
+                        <span id="simConfVal" class="text-white">0.9</span>
+                    </div>
+                    <input type="range" id="simConf" min="0.1" max="1.0" step="0.1" value="0.9" oninput="document.getElementById('simConfVal').innerText=this.value" class="w-full cursor-pointer">
+                    <button onclick="runCustomSimulation()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium py-2 rounded transition border border-emerald-500 flex items-center justify-center gap-2 shadow-[0_0_10px_rgba(16,185,129,0.3)]">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                        Inject Event to Cognee
+                    </button>
+                    <p class="text-[10px] text-slate-500 text-center leading-tight">Proves dynamic data insertion into Kuzu/LanceDB</p>
+                </div>
+
+                <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mt-8 mb-4">Compliance Query</h2>
+                <div class="space-y-3">
+                    <input type="text" id="queryInput" placeholder="e.g. Show anomalies..." class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm text-white focus:outline-none focus:border-blue-500">
+                    <button onclick="runQuery()" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 rounded transition">
+                        Run Audit Query (GRAPH_COMPLETION)
+                    </button>
+                </div>
+                
+                <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mt-8 mb-4">Actions</h2>
+                <div class="space-y-3">
+                    <!-- Improve Memory — shows the graph getting smarter -->
+                    <div>
+                        <button id="improveBtn" onclick="runImprove()" class="w-full bg-[#8a2be2] hover:bg-[#7a22c9] shadow-[0_0_15px_rgba(138,43,226,0.4)] text-white text-sm font-medium py-2 rounded transition border border-[#8a2be2] flex items-center justify-center gap-2">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                            Improve Memory (cognee.improve)
+                        </button>
+                        <p class="text-xs text-slate-500 mt-1 text-center">Enriches the graph — ask the same question before and after to see the difference</p>
+                    </div>
+                    <div>
+                        <button onclick="proveMemoryPersists()" class="w-full bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium py-2 rounded transition border border-slate-600 flex items-center justify-center gap-2">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                            Prove Persistent Memory
+                        </button>
+                        <p class="text-xs text-slate-500 mt-1 text-center">Queries all sessions — works after page refresh too</p>
+                    </div>
+                    <button onclick="exportGraph()" class="w-full bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium py-2 rounded transition border border-slate-600">
+                        Export Cognee Graph HTML
+                    </button>
+                    <!-- Cloud Sync — only shown when COGNEE_CLOUD_* env vars are set -->
+                    <div id="cloud-sync-section" class="hidden">
+                        <button id="syncBtn" onclick="syncToCloud()" class="w-full bg-blue-700 hover:bg-blue-600 text-white text-sm font-medium py-2 rounded transition border border-blue-600 flex items-center justify-center gap-2">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+                            Sync to Cognee Cloud
+                        </button>
+                        <p class="text-xs text-slate-500 mt-1 text-center">Pushes local audit events to your cloud tenant</p>
+                    </div>
+                </div>
+
+                <!-- Improve Session Selector -->
+                <div class="mt-3">
+                    <input type="text" id="improveSessionInput" placeholder="Session ID to improve (optional)" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-white focus:outline-none focus:border-violet-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="flex-1 flex flex-col bg-slate-950 relative">
+            
+            <!-- Graph Container (Custom D3 for live demo) -->
+            <div id="graph-container" class="flex-1 relative bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900/40 via-black to-black">
+                <!-- D3 SVG will be injected here -->
+                
+                <!-- Architecture Pipeline Graphic (Bottom) -->
+                <div class="absolute bottom-6 left-0 right-0 pointer-events-none flex justify-center z-0 opacity-80">
+                    <div class="flex items-end gap-1">
+                        <div class="flex flex-col items-start gap-2 w-56">
+                            <span class="text-white text-[10px] font-bold tracking-[0.2em] ml-1">REMEMBER</span>
+                            <div class="w-full h-[3px] bg-[#00ff41] shadow-[0_0_10px_#00ff41]"></div>
+                            <span class="text-[9px] text-slate-500 ml-1 leading-tight">Ingest documents, extract chunks and entities. Build the initial graph.</span>
+                        </div>
+                        <div class="flex flex-col items-start gap-2 w-56">
+                            <span class="text-white text-[10px] font-bold tracking-[0.2em] ml-1">IMPROVE</span>
+                            <div class="w-full h-[3px] bg-[#8a2be2] shadow-[0_0_10px_#8a2be2]"></div>
+                            <span class="text-[9px] text-slate-500 ml-1 leading-tight">Enrich the graph by creating additional nodes and relationships.</span>
+                        </div>
+                        <div class="flex flex-col items-start gap-2 w-56">
+                            <span class="text-white text-[10px] font-bold tracking-[0.2em] ml-1">RECALL</span>
+                            <div class="w-full h-[3px] border-t-[3px] border-dashed border-[#8a2be2] opacity-60"></div>
+                            <span class="text-[9px] text-slate-500 ml-1 leading-tight">Retrieve and answer with grounded context from the graph.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="absolute top-4 right-4 bg-black/80 p-4 rounded border border-slate-800 text-xs backdrop-blur-md shadow-2xl flex flex-col gap-4 z-10">
+                    <div>
+                        <h4 class="font-semibold mb-3 text-slate-300 border-b border-slate-800 pb-1 uppercase tracking-wider text-[10px]">Graph Legend</h4>
+                        <div class="flex items-center gap-3 mb-2">
+                            <span class="w-3 h-3 rounded-full bg-[#00ff41] shadow-[0_0_8px_#00ff41]"></span> 
+                            <span class="text-slate-300">Extracted Entities (Events)</span>
+                        </div>
+                        <div class="flex items-center gap-3 mb-2">
+                            <span class="w-3 h-3 rounded-full bg-[#8a2be2] shadow-[0_0_8px_#8a2be2]"></span> 
+                            <span class="text-slate-300">Derived Concepts (Users/Sessions)</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="w-3 h-3 rounded-full bg-[#ff4d4d] shadow-[0_0_8px_#ff4d4d]"></span> 
+                            <span class="text-slate-300">High Risk / Anomaly</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabbed Bottom Panel -->
+            <div class="h-80 glass-panel border-t border-slate-800 flex flex-col z-10">
+                <!-- Tab bar -->
+                <div class="bg-slate-900 border-b border-slate-700 flex items-center justify-between px-2">
+                    <div class="flex">
+                        <button onclick="switchTab('logs')" id="tab-logs" class="tab-btn active px-4 py-2 text-xs text-slate-400 font-medium">TERMINAL</button>
+                        <button onclick="switchTab('chat')" id="tab-chat" class="tab-btn px-4 py-2 text-xs text-slate-400 font-medium">AI AGENT CHAT</button>
+                        <button onclick="switchTab('memory')" id="tab-memory" class="tab-btn px-4 py-2 text-xs text-slate-400 font-medium">MEMORY CONTEXT</button>
+                    </div>
+                    <button onclick="document.getElementById('panel-logs').innerHTML=''" class="text-xs text-slate-500 hover:text-white px-3 py-1 transition" title="Clear logs">Clear</button>
+                </div>
+
+                <!-- Panel: Terminal Logs -->
+                <div id="panel-logs" class="flex-1 p-4 overflow-y-auto console-output text-slate-300 space-y-2">
+                    <div class="text-blue-400">AuditMind initialized. Waiting for scenario selection...</div>
+                </div>
+
+                <!-- Panel: AI Agent Chat -->
+                <div id="panel-chat" class="hidden flex-1 flex flex-col min-h-0">
+                    <div id="chat-messages" class="flex-1 min-h-0 p-4 overflow-y-auto space-y-3 console-output text-sm">
+                        <div class="text-center text-slate-500 text-xs mt-4">
+                            Ask the agent anything about your audit trail. Memory persists across sessions via Cognee.
+                        </div>
+                    </div>
+                    <div class="border-t border-slate-700 p-2 flex gap-2 items-center">
+                        <input id="chatInput" type="text" placeholder="e.g. Was there fraud in today's exam session?" onkeydown="if(event.key==='Enter')sendChat()"
+                            class="flex-1 bg-slate-950 border border-slate-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-violet-500">
+                        <button onclick="sendChat()" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-medium px-3 py-1.5 rounded transition whitespace-nowrap">Send</button>
+                        <button onclick="snapshotChat()" title="Snapshot this Q for before/after improve() compare" class="bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs px-2 py-1.5 rounded transition" id="snapshotBtn">
+                            📸 Snapshot
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Panel: Memory Context (raw Cognee graph recall) -->
+                <div id="panel-memory" class="hidden flex-1 p-4 overflow-y-auto console-output text-slate-400 space-y-2 text-xs">
+                    <div class="text-slate-500">Raw memory context from Cognee's graph will appear here after a chat query.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Before/After Improve Comparison Modal -->
+    <div id="compareModal" class="hidden fixed inset-0 bg-black/85 z-50 flex items-center justify-center backdrop-blur-sm p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-lg shadow-2xl w-full max-w-4xl flex flex-col" style="max-height:85vh">
+            <div class="flex items-center justify-between p-4 border-b border-slate-700">
+                <div>
+                    <h3 class="text-white font-bold">Before vs After <code class="text-violet-400 text-sm">cognee.improve()</code></h3>
+                    <p class="text-xs text-slate-400 mt-0.5" id="compareQuestion"></p>
+                </div>
+                <button onclick="document.getElementById('compareModal').classList.add('hidden')" class="text-slate-400 hover:text-white text-xl leading-none">✕</button>
+            </div>
+            <div class="grid grid-cols-2 gap-4 p-4 overflow-y-auto flex-1">
+                <div class="compare-col p-4">
+                    <div class="text-xs font-semibold text-amber-400 mb-3 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-amber-400 block"></span> BEFORE improve()
+                    </div>
+                    <div id="compareBefore" class="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap"></div>
+                </div>
+                <div class="compare-col p-4">
+                    <div class="text-xs font-semibold text-green-400 mb-3 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-green-400 block"></span> AFTER improve()
+                    </div>
+                    <div id="compareAfter" class="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">
+                        <div id="compareAfterLoading" class="text-slate-500 text-xs">Click "Run Improve &amp; Ask Again" to see enriched answer</div>
+                    </div>
+                </div>
+            </div>
+            <div class="border-t border-slate-700 p-4 flex gap-3">
+                <button onclick="runImproveAndCompare()" id="compareRunBtn"
+                    class="bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded transition flex items-center gap-2">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                    Run Improve &amp; Ask Again
+                </button>
+                <button onclick="document.getElementById('compareModal').classList.add('hidden')" class="bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium px-4 py-2 rounded transition">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NDPR Certificate Modal -->
+    <div id="certModal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center backdrop-blur-sm">
+        <div class="bg-slate-900 border border-slate-700 rounded-lg p-6 max-w-md w-full shadow-2xl">
+            <div class="flex items-center gap-3 text-amber-500 mb-4 border-b border-slate-700 pb-4">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <h3 class="text-lg font-bold text-white">NDPR Certificate of Deletion</h3>
+            </div>
+            <div class="space-y-2 text-sm text-slate-300 font-mono bg-slate-950 p-4 rounded border border-slate-800">
+                <p>CERT_ID: <span id="certId" class="text-blue-400"></span></p>
+                <p>STATUS: <span class="text-green-400">DATASET_PURGED</span></p>
+                <p>TIMESTAMP: <span id="certTime" class="text-slate-400"></span></p>
+                <p>LAW: NDPR Article 17 / GDPR Right to Erasure</p>
+                <p class="mt-4 text-xs text-slate-500 italic">Target dataset eradicated from relational, vector, and graph stores via cognee.forget()</p>
+            </div>
+            <button onclick="document.getElementById('certModal').classList.add('hidden')" class="mt-6 w-full bg-slate-800 hover:bg-slate-700 text-white font-medium py-2 rounded transition">Close</button>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "%%API_BASE%%";
+        let scenarios = {};
+        let simulation;
+        let graphData = { nodes: [], links: [] };
+        let scenarioRunning = false;
+        let chatHistory = [];       // multi-turn chat history
+        let compareSnapshot = null; // { question, response, sessionId } for before/after
+
+        // ── Tab switching ───────────────────────────────────────────────────────
+        function switchTab(name) {
+            ["logs", "chat", "memory"].forEach(t => {
+                document.getElementById(`panel-${t}`).classList.toggle("hidden", t !== name);
+                document.getElementById(`tab-${t}`).classList.toggle("active", t === name);
+            });
+        }
+
+        // ── Mode badge ──────────────────────────────────────────────────────────
+        async function loadModeBadge() {
+            try {
+                const res = await fetch(`${API_BASE}/api/mode`);
+                const data = await res.json();
+                const badge = document.getElementById('mode-badge');
+                const isCloud = data.mode === 'cloud';
+                // Show what Cognee gives you, not which backend binary is running.
+                // Cloud: emphasise cross-machine persistence. OSS: emphasise graph+vector stack.
+                badge.innerHTML = isCloud
+                    ? `<span class="w-2 h-2 rounded-full bg-blue-400 block"></span>
+                       <span class="text-blue-300">Cognee Cloud</span>
+                       <span class="text-slate-600 ml-1">· persistent across machines</span>`
+                    : `<span class="w-2 h-2 rounded-full bg-emerald-400 block"></span>
+                       <span class="text-emerald-300">Hybrid Graph-Vector Memory</span>
+                       <span class="text-slate-600 ml-1">· ${data.graph_db} + ${data.vector_db}</span>`;
+                if (data.cloud_sync_available) {
+                    document.getElementById('cloud-sync-section').classList.remove('hidden');
+                }
+            } catch (_) { /* badge stays as "Loading..." */ }
+        }
+
+        // ── Utility ─────────────────────────────────────────────────────────────
+        function getContainerDimensions() {
+            const el = document.getElementById('graph-container');
+            return { width: el.clientWidth || 800, height: el.clientHeight || 500 };
+        }
+
+        function showToast(message, type = "info") {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            let bgClass = "bg-slate-800 border-slate-700";
+            let textClass = "text-slate-200";
+            let icon = `<svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+            
+            if (type === "success") {
+                bgClass = "bg-[#0d1117] border-[#00d4aa]/50";
+                icon = `<svg class="w-5 h-5 text-[#00d4aa]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+            } else if (type === "error") {
+                bgClass = "bg-[#0d1117] border-[#ff4d4d]/50";
+                icon = `<svg class="w-5 h-5 text-[#ff4d4d]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+            } else if (type === "warning") {
+                bgClass = "bg-[#0d1117] border-[#f5a623]/50";
+                icon = `<svg class="w-5 h-5 text-[#f5a623]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>`;
+            }
+            
+            toast.className = `glass-panel flex items-center gap-3 px-4 py-3 rounded border shadow-lg toast-enter pointer-events-auto ${bgClass}`;
+            toast.innerHTML = `
+                ${icon}
+                <p class="text-sm font-medium ${textClass}">${message}</p>
+            `;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.remove('toast-enter');
+                toast.classList.add('toast-exit');
+                setTimeout(() => toast.remove(), 300);
+            }, 5000);
+        }
+        
+        const svg = d3.select("#graph-container")
+            .append("svg")
+            .attr("width", "100%")
+            .attr("height", "100%")
+            .call(d3.zoom().on("zoom", (e) => svg.select("g").attr("transform", e.transform)))
+            .append("g");
+
+        function log(msg, type="info") {
+            const c = document.getElementById('panel-logs');
+            const color = type === 'error' ? 'text-red-400' : type === 'success' ? 'text-green-400' : 'text-slate-300';
+            c.innerHTML += `<div class="${color}"><span class="text-slate-500">[${new Date().toISOString().split('T')[1].split('.')[0]}]</span> ${msg}</div>`;
+            c.scrollTop = c.scrollHeight;
+        }
+
+        async function init() {
+            try {
+                const res = await fetch(`${API_BASE}/api/scenarios`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                scenarios = await res.json();
+                log("Loaded 3 demo scenarios from backend.", "success");
+            } catch (e) {
+                log(`Failed to connect to backend: ${e.message}`, "error");
+                showToast(`Backend connection failed: ${e.message}`, "error");
+            }
+        }
+
+        function renderGraph() {
+            // Stop any running simulation before rebuilding to prevent accumulation
+            if (simulation) simulation.stop();
+            svg.selectAll("*").remove();
+
+            const { width, height } = getContainerDimensions();
+
+            simulation = d3.forceSimulation(graphData.nodes)
+                .force("link", d3.forceLink(graphData.links).id(d => d.id).distance(100))
+                .force("charge", d3.forceManyBody().strength(-300))
+                .force("center", d3.forceCenter(width / 2, height / 2));
+
+            const link = svg.append("g")
+                .attr("class", "links")
+                .selectAll("line")
+                .data(graphData.links)
+                .enter().append("line")
+                .attr("class", "link");
+
+            const node = svg.append("g")
+                .attr("class", "nodes")
+                .selectAll("g")
+                .data(graphData.nodes)
+                .enter().append("g")
+                .attr("id", d => `node-${d.id}`);
+
+            node.append("circle")
+                .attr("r", d => d.type === 'session' ? 12 : 8)
+                .attr("fill", d => {
+                    if (d.type === 'session' || d.type === 'user') return '#8a2be2'; // neon purple
+                    if (d.status === 'CLEAN') return '#00ff41'; // neon green
+                    if (d.status === 'ANOMALY') return '#f5a623'; // amber
+                    if (d.status === 'HIGH_RISK') return '#ff4d4d'; // red
+                    return '#94a3b8';
+                })
+                .style("filter", d => {
+                    // Add subtle glow to nodes
+                    if (d.type === 'session' || d.type === 'user') return 'drop-shadow(0 0 5px rgba(138,43,226,0.6))';
+                    if (d.status === 'CLEAN') return 'drop-shadow(0 0 5px rgba(0,255,65,0.6))';
+                    if (d.status === 'HIGH_RISK') return 'drop-shadow(0 0 5px rgba(255,77,77,0.6))';
+                    return 'none';
+                });
+
+            node.append("text")
+                .attr("dx", 12)
+                .attr("dy", ".35em")
+                .attr("fill", "#cbd5e1")
+                .text(d => d.label);
+
+            simulation.on("tick", () => {
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+                node
+                    .attr("transform", d => `translate(${d.x},${d.y})`);
+            });
+        }
+
+        function addGraphEvent(event) {
+            const sessionId = event.session_id;
+            const userId = event.user_id;
+            const eventId = event.event_id;
+            
+            let status = 'CLEAN';
+            if (event.confidence < 0.5) status = 'HIGH_RISK';
+            else if (event.confidence < 0.7) status = 'ANOMALY';
+
+            if (!graphData.nodes.find(n => n.id === sessionId)) {
+                graphData.nodes.push({ id: sessionId, label: `Session: ${sessionId}`, type: 'session' });
+            }
+            if (!graphData.nodes.find(n => n.id === userId)) {
+                graphData.nodes.push({ id: userId, label: `User: ${userId}`, type: 'user' });
+                graphData.links.push({ source: userId, target: sessionId, type: 'started' });
+            }
+            
+            graphData.nodes.push({ id: eventId, label: event.event_type, type: 'event', status: status, session: sessionId });
+            graphData.links.push({ source: sessionId, target: eventId, type: 'has_event' });
+            
+            renderGraph();
+        }
+
+        function clearHighlights() {
+            svg.selectAll(".node circle").each(function(d) {
+                if (d._originalColor) {
+                    d3.select(this).attr("fill", d._originalColor).attr("r", d.type === 'session' ? 12 : 8);
+                    delete d._originalColor;
+                }
+            });
+        }
+
+        function highlightNodes(resultStrings) {
+            if (!graphData.nodes.length) return;
+            clearHighlights();
+            let matched = 0;
+            svg.selectAll(".node circle").each(function(d) {
+                const needle = (d.id + " " + (d.label || "")).toLowerCase();
+                const hit = resultStrings.some(r => {
+                    const rs = (typeof r === "string" ? r : JSON.stringify(r)).toLowerCase();
+                    return rs.includes(d.id.toLowerCase()) || (d.label && rs.includes(d.label.toLowerCase()));
+                });
+                if (hit) {
+                    d._originalColor = d3.select(this).attr("fill");
+                    d3.select(this).attr("fill", "#a78bfa").attr("r", (d.type === 'session' ? 12 : 8) + 4);
+                    matched++;
+                }
+            });
+            if (matched > 0) {
+                log(`Highlighted ${matched} matching node(s) in graph.`, "success");
+                setTimeout(clearHighlights, 5000);
+            }
+        }
+
+        async function runScenario(scenarioId) {
+            const events = scenarios[scenarioId];
+            if (!events) return;
+
+            showToast(`Starting scenario: ${scenarioId.toUpperCase()}`, "info");
+            log(`▶️ Starting scenario: ${scenarioId.toUpperCase()}`, "info");
+            
+            if (scenarioId === 'ndpr_purge') {
+                // Ingest first
+                const sessionId = events[0].session_id;
+                for (const ev of events) {
+                    log(`POST /api/event -> Ingesting ${ev.event_id} into Cognee...`);
+                    addGraphEvent(ev);
+                    try {
+                        const res = await fetch(`${API_BASE}/api/event`, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify(ev)
+                        });
+                        if (!res.ok) {
+                            const errData = await res.json();
+                            showToast(`Error ${res.status}: ${errData.message || res.statusText}`, "error");
+                            log(`Error: ${errData.message}`, "error");
+                        }
+                    } catch(e) {
+                        showToast(`Network Error: ${e.message}`, "error");
+                    }
+                    await new Promise(r => setTimeout(r, 50)); // Snappy visual delay
+                }
+                
+                log(`DELETE /api/forget -> Triggering NDPR Purge for dataset session_${sessionId}...`, "error");
+                
+                // Visual fade out — match event nodes (by session), the session node itself, and the user node
+                const purgeUserId = events[0].user_id;
+                graphData.nodes.forEach(n => {
+                    if (n.session === sessionId || n.id === sessionId || n.id === purgeUserId) {
+                        d3.select(`#node-${n.id}`).classed("fade-out", true);
+                    }
+                });
+                
+                try {
+                    const res = await fetch(`${API_BASE}/api/forget?session_id=${sessionId}`, {
+                        method: 'DELETE',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({reason: "Data subject requested deletion under NDPR Article 17"})
+                    });
+                    
+                    if (!res.ok) {
+                        const err = await res.json();
+                        throw new Error(err.message || 'Purge failed');
+                    }
+                    
+                    const data = await res.json();
+                    
+                    setTimeout(() => {
+                        document.getElementById('certId').innerText = data.certificate_id;
+                        document.getElementById('certTime').innerText = data.timestamp;
+                        document.getElementById('certModal').classList.remove('hidden');
+                        
+                        // Clear graph data visually
+                        graphData = { nodes: [], links: [] };
+                        renderGraph();
+                        showToast("Data erased. Certificate issued.", "success");
+                    }, 1500);
+                } catch(e) {
+                    showToast(`Forget Failed: ${e.message}`, "error");
+                    log(`NDPR Purge failed: ${e.message}`, "error");
+                }
+
+            } else {
+                // Normal ingest
+                let sessionId = "";
+                for (const ev of events) {
+                    sessionId = ev.session_id;
+                    log(`POST /api/event -> cognee.remember() -> ${ev.event_id} (confidence: ${ev.confidence})`);
+                    addGraphEvent(ev);
+
+                    try {
+                        const res = await fetch(`${API_BASE}/api/event`, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify(ev)
+                        });
+                        if (!res.ok) {
+                            const errData = await res.json();
+                            showToast(`Ingest Error: ${errData.message || res.statusText}`, "error");
+                        }
+                    } catch(e) {
+                        showToast(`Network Error: ${e.message}`, "error");
+                    }
+
+                    await new Promise(r => setTimeout(r, 50)); // Visual delay
+                }
+
+                document.getElementById('improveSessionInput').value = sessionId;
+                await runImprove(sessionId);
+                scenarioRunning = false;
+                log(`Scenario complete. Graph built. Try asking the agent about it.`, "success");
+                switchTab('chat');
+            }
+        }
+
+        async function runQuery() {
+            const q = document.getElementById('queryInput').value || "Show anomalies";
+            log(`POST /api/query -> cognee.recall(type=GRAPH_COMPLETION) -> "${q}"`);
+
+            try {
+                const res = await fetch(`${API_BASE}/api/query`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({query: q})
+                });
+                const data = await res.json();
+                log(`Query returned ${data.results.length} result path(s).`, "success");
+                data.results.forEach(r => {
+                    // Try to pretty-print JSON results; fall back to raw string
+                    let display = r;
+                    if (typeof r === "string") {
+                        try {
+                            const parsed = JSON.parse(r);
+                            display = JSON.stringify(parsed, null, 2)
+                                .split("\n").slice(0, 6).join(" "); // one-liner summary
+                        } catch (_) { /* keep raw */ }
+                    }
+                    log(`↳ ${display}`);
+                });
+                // Highlight matching graph nodes
+                if (data.results.length > 0) {
+                    highlightNodes(data.results);
+                }
+            } catch(e) {
+                log(`Query failed: ${e.message}`, "error");
+            }
+        }
+        
+        async function runCustomSimulation() {
+            const userId = document.getElementById('simUser').value.trim() || `USR-${Math.floor(Math.random() * 900) + 100}`;
+            const type = document.getElementById('simType').value;
+            const conf = parseFloat(document.getElementById('simConf').value);
+            
+            // Reuse session from input if available, else new
+            let sessionId = document.getElementById('improveSessionInput').value.trim();
+            if (!sessionId) {
+                sessionId = `SESS-${Math.floor(Math.random() * 9000) + 1000}`;
+            }
+            
+            const eventType = conf >= 0.7 ? "verification_pass" : conf >= 0.5 ? "anomaly_detected" : "verification_fail";
+            const ev = {
+                event_id: `EV-${Math.floor(Math.random() * 90000) + 10000}`,
+                user_id: userId,
+                session_id: sessionId,
+                session_type: type,
+                event_type: eventType,
+                confidence: conf,
+                timestamp: new Date().toISOString(),
+                location: "IP_UNKNOWN",
+                device: "custom_simulator",
+                institution: "AuditMind Demo",
+                flag: conf < 0.5 ? "SUSPICIOUS_ACTIVITY" : conf < 0.7 ? "ANOMALY_FLAGGED" : "none"
+            };
+
+            showToast(`Injecting Custom Event...`, "info");
+            log(`POST /api/event -> Injecting custom event (${ev.event_id}) into Cognee...`);
+            
+            addGraphEvent(ev);
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/event`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(ev)
+                });
+                if (!res.ok) {
+                    const errData = await res.json();
+                    showToast(`Error ${res.status}: ${errData.message || res.statusText}`, "error");
+                    log(`Error: ${errData.message}`, "error");
+                } else {
+                    document.getElementById('improveSessionInput').value = sessionId;
+                    log(`Custom event processed. Graph updated.`, "success");
+                    showToast(`Event injected successfully`, "success");
+                }
+            } catch(e) {
+                showToast(`Network Error: ${e.message}`, "error");
+            }
+        }
+
+
+        async function exportGraph() {
+            log(`GET /api/graph/export -> cognee.visualize_graph()...`);
+            try {
+                const res = await fetch(`${API_BASE}/api/graph/export`);
+                const data = await res.json();
+                log(`Graph exported. File: ${data.path}`, "success");
+            } catch (e) {
+                log(`Export failed: ${e.message}`, "error");
+            }
+        }
+
+        async function syncToCloud() {
+            const btn = document.getElementById('syncBtn');
+            btn.disabled = true;
+            btn.textContent = 'Syncing...';
+            log(`POST /api/sync -> pushing local events to Cognee Cloud...`);
+            try {
+                const res = await fetch(`${API_BASE}/api/sync`, { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+                log(`Cloud sync complete: ${data.sessions_synced}/${data.sessions_total} session(s) synced.`, "success");
+                showToast(`Synced ${data.sessions_synced} session(s) to Cognee Cloud`, "success");
+            } catch (e) {
+                log(`Cloud sync failed: ${e.message}`, "error");
+                showToast(`Cloud sync failed: ${e.message}`, "error");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg> Sync to Cognee Cloud`;
+            }
+        }
+
+        // ── AI Agent Chat ───────────────────────────────────────────────────────
+        function addChatBubble(role, text, memoryHits) {
+            const box = document.getElementById('chat-messages');
+            const isUser = role === 'user';
+            const bubble = document.createElement('div');
+            bubble.className = `flex flex-col gap-1 ${isUser ? 'items-end' : 'items-start'}`;
+            bubble.innerHTML = `
+                <div class="text-xs text-slate-500">${isUser ? 'You' : 'AuditMind Agent'}</div>
+                <div class="max-w-lg px-3 py-2 text-sm text-slate-200 leading-relaxed ${isUser ? 'chat-bubble-user' : 'chat-bubble-agent'}">${text.replace(/\n/g, '<br>')}</div>
+                ${(!isUser && memoryHits !== undefined) ? `<div class="text-xs text-slate-600">${memoryHits} memory node(s) recalled from Cognee</div>` : ''}
+            `;
+            box.appendChild(bubble);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function addTypingIndicator() {
+            const box = document.getElementById('chat-messages');
+            const el = document.createElement('div');
+            el.id = 'typing-indicator';
+            el.className = 'flex items-start gap-1';
+            el.innerHTML = `<div class="chat-bubble-agent px-3 py-2 flex gap-1 items-center">
+                <span class="typing-dot w-1.5 h-1.5 bg-violet-400 rounded-full block"></span>
+                <span class="typing-dot w-1.5 h-1.5 bg-violet-400 rounded-full block"></span>
+                <span class="typing-dot w-1.5 h-1.5 bg-violet-400 rounded-full block"></span>
+            </div>`;
+            box.appendChild(el);
+            box.scrollTop = box.scrollHeight;
+            return el;
+        }
+
+        async function sendChat(overrideMessage) {
+            const input = document.getElementById('chatInput');
+            const message = overrideMessage || input.value.trim();
+            if (!message) return;
+            input.value = '';
+
+            switchTab('chat');
+            addChatBubble('user', message);
+            const typing = addTypingIndicator();
+            log(`POST /api/chat -> Cognee recall + Claude reasoning...`);
+
+            // Get current session from last active scenario (if any)
+            const sessionInput = document.getElementById('improveSessionInput');
+            const sessionId = sessionInput.value.trim() || null;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/chat`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ message, session_id: sessionId, history: chatHistory })
+                });
+                
+                let data;
+                const text = await res.text();
+                try {
+                    data = JSON.parse(text);
+                } catch(err) {
+                    throw new Error(`Server error: ${text.substring(0, 100)}`);
+                }
+                
+                typing.remove();
+
+                if (!res.ok) throw new Error(data.detail || data.message || 'Chat failed');
+
+                addChatBubble('assistant', data.response, data.memory_hits);
+
+                // Update multi-turn history
+                chatHistory.push({ role: 'user', content: message });
+                chatHistory.push({ role: 'assistant', content: data.response });
+                if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20); // keep last 10 turns
+
+                // Update memory context panel
+                const memPanel = document.getElementById('panel-memory');
+                memPanel.innerHTML = `<div class="text-slate-500 mb-2">Memory context retrieved for: "${message}"</div>` +
+                    (data.memory_context.length
+                        ? data.memory_context.map(r => `<div class="text-slate-400 border-b border-slate-800 pb-2 mb-2">${r}</div>`).join('')
+                        : '<div class="text-slate-600">No relevant records in Cognee memory for this query.</div>');
+
+                // Highlight graph nodes if memory was used
+                if (data.memory_context.length > 0) highlightNodes(data.memory_context);
+
+                log(`Agent responded. ${data.memory_hits} memory hit(s). Model: ${data.model}`, "success");
+            } catch (e) {
+                typing.remove();
+                addChatBubble('assistant', `Error: ${e.message}`);
+                log(`Chat failed: ${e.message}`, "error");
+            }
+        }
+
+        function snapshotChat() {
+            const input = document.getElementById('chatInput');
+            const question = input.value.trim() || (chatHistory.length >= 2 ? chatHistory[chatHistory.length - 2].content : '');
+            const lastAnswer = chatHistory.length >= 2 ? chatHistory[chatHistory.length - 1].content : null;
+            if (!question) { showToast("Type a question first, then snapshot it", "warning"); return; }
+            const sessionInput = document.getElementById('improveSessionInput');
+            compareSnapshot = { question, response: lastAnswer, sessionId: sessionInput.value.trim() || null };
+            document.getElementById('compareQuestion').textContent = `"${question}"`;
+            document.getElementById('compareBefore').textContent = lastAnswer || '(no answer yet — send the question first, then snapshot)';
+            document.getElementById('compareAfter').innerHTML = '<div id="compareAfterLoading" class="text-slate-500 text-xs">Click "Run Improve & Ask Again" to see enriched answer</div>';
+            document.getElementById('compareModal').classList.remove('hidden');
+            showToast("Snapshot saved. Now run Improve & Ask Again.", "info");
+        }
+
+        // ── Improve Memory ──────────────────────────────────────────────────────
+        async function runImprove(sessionIdOverride) {
+            const sessionInput = document.getElementById('improveSessionInput');
+            const sessionId = sessionIdOverride || sessionInput.value.trim() || 'all';
+            const btn = document.getElementById('improveBtn');
+            btn.disabled = true;
+            btn.classList.add('opacity-50');
+            log(`POST /api/improve/${sessionId} -> cognee.improve() enriching graph...`);
+            showToast("Running cognee.improve() — enriching the knowledge graph...", "info");
+            try {
+                const res = await fetch(`${API_BASE}/api/improve/${sessionId}`, { method: 'POST' });
+                if (!res.ok) { const e = await res.json(); throw new Error(e.detail || e.message); }
+                const data = await res.json();
+                log(`Memory improved. Dataset: ${data.dataset}`, "success");
+                showToast("Memory enriched. Ask the same question again to see the difference.", "success");
+            } catch (e) {
+                log(`Improve failed: ${e.message}`, "error");
+                showToast(`Improve failed: ${e.message}`, "error");
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50');
+            }
+        }
+
+        async function runImproveAndCompare() {
+            if (!compareSnapshot) { showToast("Take a snapshot first", "warning"); return; }
+            const runBtn = document.getElementById('compareRunBtn');
+            runBtn.disabled = true;
+            runBtn.textContent = 'Running...';
+            document.getElementById('compareAfter').innerHTML = `<div class="flex gap-1 items-center">
+                <span class="typing-dot w-1.5 h-1.5 bg-green-400 rounded-full block"></span>
+                <span class="typing-dot w-1.5 h-1.5 bg-green-400 rounded-full block"></span>
+                <span class="typing-dot w-1.5 h-1.5 bg-green-400 rounded-full block"></span>
+            </div>`;
+
+            // 1. Run improve
+            await runImprove(compareSnapshot.sessionId);
+
+            // 2. Ask the same question again
+            try {
+                const res = await fetch(`${API_BASE}/api/chat`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ message: compareSnapshot.question, session_id: compareSnapshot.sessionId, history: [] })
+                });
+                const data = await res.json();
+                document.getElementById('compareAfter').textContent = data.response;
+                addChatBubble('assistant', `[After improve()] ${data.response}`, data.memory_hits);
+            } catch(e) {
+                document.getElementById('compareAfter').textContent = `Error: ${e.message}`;
+            } finally {
+                runBtn.disabled = false;
+                runBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg> Run Improve & Ask Again`;
+            }
+        }
+
+        // ── Graph Re-hydration ──────────────────────────────────────────────────
+        async function rehydrateGraph() {
+            try {
+                const res = await fetch(`${API_BASE}/api/graph/nodes`);
+                if (!res.ok) return;
+                const data = await res.json();
+                if (!data.nodes || data.nodes.length === 0) return;
+                graphData = { nodes: data.nodes, links: data.links };
+                renderGraph();
+                log(`Graph re-hydrated from Cognee: ${data.nodes.length} node(s) across ${data.sessions.length} session(s).`, "success");
+                showToast(`Memory restored from Cognee — ${data.sessions.length} session(s) reloaded`, "success");
+            } catch (_) { /* backend not running yet — silent */ }
+        }
+
+        // ── Persistent Memory Demo ──────────────────────────────────────────────
+        async function proveMemoryPersists() {
+            // Clear session filter so recall spans ALL stored datasets
+            document.getElementById('improveSessionInput').value = '';
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+            log('MEMORY PERSISTENCE TEST', 'info');
+            log('Step 1: Re-hydrating D3 graph from Cognee storage...', 'info');
+            await rehydrateGraph();
+            log('Step 2: Querying agent across ALL sessions with no filter...', 'info');
+            log('This works even after a full page refresh — memory lives in Cognee, not the browser.', 'info');
+            switchTab('chat');
+            const question = 'What identity verification events have been recorded? List all sessions, users, and any anomalies or flags found.';
+            sendChat(question);
+        }
+
+        window.onload = async () => {
+            await init();
+            await loadModeBadge();
+            await rehydrateGraph();  // Re-draw graph from Cognee on every page load
+        };
+    </script>
+</body>
+</html>

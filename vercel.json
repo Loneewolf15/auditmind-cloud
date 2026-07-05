@@ -1,0 +1,5 @@
+{
+  "buildCommand": "sed -i \"s|%%API_BASE%%|$API_BASE|g\" frontend/index.html",
+  "outputDirectory": "frontend",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}

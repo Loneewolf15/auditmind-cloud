@@ -1,0 +1,27 @@
+# Secrets — never commit
+.env
+.env.cloud
+.env.selfhosted
+.env.local
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Cognee local stores
+cognee_db/
+.cognee_system/
+lancedb/
+kuzu_db/
+data/
+
+# Misc
+.DS_Store
+*.log
