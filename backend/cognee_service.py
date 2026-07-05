@@ -134,8 +134,19 @@ async def agent_chat(message: str, session_id: str = None, history: list = None)
     Memory persists across sessions; the agent gets context, not amnesia.
     """
     # 1. Recall relevant memory from Cognee's knowledge graph
-    memory = await recall_audit(message, session_id)
-    memory_context = memory["results"]
+    # Falls back to the in-memory event cache if graph recall times out
+    try:
+        memory = await asyncio.wait_for(recall_audit(message, session_id), timeout=15.0)
+        memory_context = memory["results"]
+        if not memory_context:
+            raise ValueError("empty recall")
+    except Exception as e:
+        logger.warning(f"Graph recall unavailable ({type(e).__name__}), using event cache as context")
+        if session_id and session_id in _event_data_cache:
+            events = _event_data_cache[session_id]
+        else:
+            events = [ev for evs in _event_data_cache.values() for ev in evs]
+        memory_context = [format_event_as_text(ev) for ev in events[:15]]
     context_str = "\n".join(memory_context) if memory_context else "No relevant records found in memory."
 
     # 2. Build the user prompt with injected Cognee context
