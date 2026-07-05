@@ -201,7 +201,10 @@ async def _call_anthropic(api_key: str, system: str, history: list, user_message
         kwargs["base_url"] = base_url
     client = anthropic.AsyncAnthropic(timeout=25.0, **kwargs)
     resp = await client.messages.create(model=model, max_tokens=1024, system=system, messages=messages)
-    return resp.content[0].text, model
+    text_content = "".join([block.text for block in resp.content if hasattr(block, "text")])
+    if not text_content:
+        text_content = str(resp.content)
+    return text_content, model
 
 
 async def _call_gemini(api_key: str, system: str, history: list, user_message: str) -> tuple[str, str]:
