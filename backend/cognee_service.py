@@ -1,3 +1,4 @@
+import asyncio
 import cognee
 from cognee.low_level import DataPoint
 from .graph_models import IdentityEvent, IDENTITY_EXTRACTION_PROMPT
@@ -88,17 +89,30 @@ async def remember_event(event_data: dict) -> dict:
 
 async def recall_audit(query: str, session_id: str = None) -> dict:
     """
-    Queries audit memory. Uses GRAPH_COMPLETION for relationship traversal.
-    Optionally session-aware for compliance officer workflows.
+    Queries audit memory. Tries GRAPH_COMPLETION first; falls back to CHUNKS
+    if it times out (GRAPH_COMPLETION makes internal LLM calls that can be slow
+    on cold Railway instances).
     """
     datasets = [f"session_{session_id}"] if session_id else None
-    
-    results = await cognee.recall(
-        query_text=query,
-        datasets=datasets,
-        session_id="compliance_officer",
-        query_type=SearchType.GRAPH_COMPLETION,
-    )
+
+    try:
+        results = await asyncio.wait_for(
+            cognee.recall(
+                query_text=query,
+                datasets=datasets,
+                session_id="compliance_officer",
+                query_type=SearchType.GRAPH_COMPLETION,
+            ),
+            timeout=20.0,
+        )
+    except (asyncio.TimeoutError, Exception) as e:
+        logger.warning(f"GRAPH_COMPLETION timed out or failed ({e}), falling back to CHUNKS")
+        results = await cognee.recall(
+            query_text=query,
+            datasets=datasets,
+            session_id="compliance_officer",
+            query_type=SearchType.CHUNKS,
+        )
 
     formatted_results = []
     for r in results:
